@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Hall Effect Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto Mono', monospace;
+            background-color: #1e293b; /* slate-800 */
+            background-image: radial-gradient(#475569 1px, transparent 1px); /* slate-600 dots */
+            background-size: 20px 20px;
+            color: #e2e8f0; /* slate-200 */
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .main-content {
+            flex-grow: 1;
+        }
+        .card {
+            background-color: rgba(30, 41, 59, 0.8); /* slate-800 with transparency */
+            border: 1px solid #334155; /* slate-700 */
+            border-radius: 8px;
+            padding: 1.5rem;
+            height: 100%;
+            box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.25);
+            backdrop-filter: blur(4px);
+        }
+        .card-title {
+            color: #38bdf8; /* sky-500 */
+            font-size: 1.25rem;
+            font-weight: 500;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #334155; /* slate-700 */
+            padding-bottom: 0.75rem;
+        }
+        .input-group {
+            display: grid;
+            grid-template-columns: 1fr 2fr 1.8fr;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1.25rem;
+        }
+        .input-group label {
+            font-weight: 400;
+            color: #94a3b8; /* slate-400 */
+        }
+        .input-field, .unit-select {
+            background-color: #0f172a; /* slate-900 */
+            border: 1px solid #334155; /* slate-700 */
+            border-radius: 6px;
+            padding: 0.5rem 0.75rem;
+            color: #e2e8f0; /* slate-200 */
+            width: 100%;
+        }
+        .input-field:focus, .unit-select:focus {
+            outline: none;
+            border-color: #38bdf8; /* sky-500 */
+        }
+        .slider-container {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            margin-top: -0.5rem;
+        }
+        .slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #334155; /* slate-700 */
+            border-radius: 5px;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
+        }
+        .slider:hover {
+            opacity: 1;
+        }
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #38bdf8; /* sky-500 */
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        .slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #38bdf8; /* sky-500 */
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        /* Tooltip styles */
+        .tooltip-container {
+            position: relative;
+            display: inline-block;
+        }
+        .tooltip {
+            visibility: hidden;
+            width: 220px;
+            background-color: #0f172a;
+            color: #e2e8f0;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 10px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -110px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            border: 1px solid #334155;
+            font-size: 0.75rem;
+        }
+        .tooltip-container:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-content container mx-auto p-4 md:p-8">
+        <h1 class="text-3xl font-bold text-center mb-8 text-e2e8f0">Interactive Hall Effect Calculator</h1>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Experimental Setup Card -->
+            <div class="card">
+                <h2 class="card-title">Experimental Setup</h2>
+                <div id="setup-inputs"></div>
+            </div>
+
+            <!-- Material Properties Card -->
+            <div class="card">
+                <h2 class="card-title">Material Properties</h2>
+                <div id="results-inputs"></div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="text-center p-4 text-xs text-slate-500">
+        NitaD, Univ Paris-Saclay, version August 3, 2025
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Constants ---
+            const q = 1.60217663e-19;
+            const sqrt2 = Math.sqrt(2);
+
+            // --- Configuration for all parameters ---
+            const parameters = {
+                current: { 
+                    label: 'Current (I)', 
+                    value: 0.1, 
+                    min: 1e-3, max: 1.0,
+                    units: { 'A': 1, 'mA': 1e-3, 'µA': 1e-6 },
+                    modes: { 'peak': 1, 'rms': sqrt2 },
+                    group: 'setup-inputs'
+                },
+                field: { 
+                    label: 'Magnetic Field (B)', 
+                    value: 1.0, 
+                    min: 1e-3, max: 10, 
+                    units: { 'T': 1, 'mT': 1e-3, 'G': 1e-4 },
+                    group: 'setup-inputs'
+                },
+                thickness: { 
+                    label: 'Thickness (t)', 
+                    value: 1e-3,
+                    min: 1e-6, max: 0.01, 
+                    units: { 'm': 1, 'cm': 1e-2, 'mm': 1e-3, 'µm': 1e-6 },
+                    group: 'setup-inputs'
+                },
+                voltage: { 
+                    label: 'Hall Voltage (V_H)', 
+                    value: 6.2421e-6,
+                    min: 1e-9, max: 5, 
+                    units: { 'V': 1, 'mV': 1e-3, 'µV': 1e-6 },
+                    modes: { 'peak': 1, 'rms': sqrt2 },
+                    group: 'setup-inputs'
+                },
+                 n: { 
+                    label: 'Carrier Density (n)', 
+                    value: 1e26,
+                    min: 1e20, max: 1e30,
+                    units: { 'm⁻³': 1, 'cm⁻³': 1e6 },
+                    group: 'results-inputs'
+                },
+                rh: { 
+                    label: 'Hall Coeff. (R_H)', 
+                    value: 6.2421e-8,
+                    min: 1e-11, max: 1e-1, 
+                    units: { 'm³/C': 1, 'cm³/C': 1e-6, 'Ohm·cm/G': 0.01 },
+                    group: 'results-inputs'
+                }
+            };
+
+            // The single source of truth for all values, always in SI units.
+            let state = {};
+
+            // --- UI Generation ---
+            function createInputField(id) {
+                const config = parameters[id];
+                const container = document.getElementById(config.group);
+                const hasModes = config.modes;
+                const unitOptions = Object.keys(config.units).map(u => `<option value="${u}">${u}</option>`).join('');
+                const modeOptions = hasModes ? Object.keys(config.modes || {}).map(m => `<option value="${m}">${m}</option>`).join('') : '';
+                const logMin = Math.log10(config.min);
+                const logMax = Math.log10(config.max);
+                const logVal = Math.log10(config.value);
+
+                const elementHTML = `
+                    <div class="input-group" id="group-${id}">
+                        <label for="input-${id}">${config.label}</label>
+                        <input type="text" id="input-${id}" data-id="${id}" class="input-field">
+                        <div class="flex space-x-2">
+                            <select id="unit-${id}" data-id="${id}" class="unit-select flex-grow">${unitOptions}</select>
+                            ${hasModes ? `<select id="mode-${id}" data-id="${id}" class="unit-select flex-grow">${modeOptions}</select>` : ''}
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" id="slider-${id}" data-id="${id}" min="${logMin}" max="${logMax}" step="0.01" value="${logVal}" class="slider">
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += elementHTML;
+            }
+            Object.keys(parameters).forEach(createInputField);
+
+            // Add Differential Checkbox
+            const setupContainer = document.getElementById('setup-inputs');
+            const differentialHTML = `
+                <div class="flex items-center justify-end mt-2 text-sm">
+                    <div class="tooltip-container">
+                        <label for="differential-checkbox" class="mr-2 cursor-pointer text-slate-400 hover:text-sky-500">Differential</label>
+                        <span class="tooltip">Select if the measured voltage is the difference between measurements at +B and -B, i.e., V_H(diff) = V(+B) - V(-B).</span>
+                    </div>
+                    <input type="checkbox" id="differential-checkbox" class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-sky-500">
+                </div>
+            `;
+            setupContainer.innerHTML += differentialHTML;
+
+
+            // --- Helper Functions ---
+            function formatNumber(num) {
+                if (num === 0 || !isFinite(num)) return "0";
+                const absNum = Math.abs(num);
+                if (absNum > 0 && (absNum < 1e-3 || absNum >= 1e4)) {
+                    return num.toExponential(3).replace(/e\+?/, 'e');
+                }
+                return Number(num.toPrecision(4)).toString();
+            }
+
+            // --- Core Calculation & State Logic ---
+            function recalculate(sourceId) {
+                const sourceGroup = parameters[sourceId].group;
+                const isDifferential = document.getElementById('differential-checkbox').checked;
+                const voltageFactor = isDifferential ? 2 : 1;
+
+                if (sourceGroup === 'setup-inputs') {
+                    // A setup parameter was changed, so recalculate material properties.
+                    if (state.current > 0 && state.field !== 0) {
+                        const singleFieldVoltage = state.voltage / voltageFactor;
+                        state.rh = (singleFieldVoltage * state.thickness) / (state.current * state.field);
+                        state.n = 1 / (q * Math.abs(state.rh));
+                    }
+                } else { // sourceGroup === 'results-inputs'
+                    // A material property was changed, so recalculate the expected voltage.
+                    if (sourceId === 'n') {
+                        state.rh = 1 / (q * state.n);
+                    } else if (sourceId === 'rh') {
+                        state.n = 1 / (q * Math.abs(state.rh));
+                    }
+                    const singleFieldVoltage = (state.rh * state.current * state.field) / state.thickness;
+                    state.voltage = singleFieldVoltage * voltageFactor;
+                }
+                
+                updateAllUiFromState();
+            }
+
+            // --- UI Update Logic ---
+            function updateAllUiFromState() {
+                Object.keys(parameters).forEach(id => {
+                    const valueSI = state[id];
+                    if (!isFinite(valueSI)) return;
+
+                    const config = parameters[id];
+                    const inputEl = document.getElementById(`input-${id}`);
+                    const sliderEl = document.getElementById(`slider-${id}`);
+                    const unitEl = document.getElementById(`unit-${id}`);
+                    const modeEl = document.getElementById(`mode-${id}`);
+
+                    // Update slider
+                    const logValueSI = Math.log10(Math.abs(valueSI));
+                    if(isFinite(logValueSI) && sliderEl) {
+                        sliderEl.value = logValueSI;
+                    }
+                    
+                    // Update text input, but not if it's the one being actively edited
+                    if (document.activeElement !== inputEl) {
+                         const unitMultiplier = config.units[unitEl.value];
+                         const modeMultiplier = modeEl ? config.modes[modeEl.value] : 1;
+                         const displayValue = valueSI / (unitMultiplier * modeMultiplier);
+                         inputEl.value = formatNumber(displayValue);
+                    }
+                });
+            }
+            
+            // --- Event Handlers ---
+            function handleInputChange(e) {
+                const id = e.target.dataset.id;
+                const isFromSlider = e.target.type === 'range';
+                
+                // 1. Update the state from the single input that changed.
+                if (isFromSlider) {
+                    const logValue = parseFloat(e.target.value);
+                    state[id] = Math.pow(10, logValue);
+                } else {
+                    const config = parameters[id];
+                    const inputEl = document.getElementById(`input-${id}`);
+                    const unitEl = document.getElementById(`unit-${id}`);
+                    const modeEl = document.getElementById(`mode-${id}`);
+                    let value = parseFloat(inputEl.value.replace(/e/i, 'e'));
+                    if (isNaN(value)) return;
+                    const unitMultiplier = config.units[unitEl.value];
+                    const modeMultiplier = modeEl ? config.modes[modeEl.value] : 1;
+                    state[id] = value * unitMultiplier * modeMultiplier;
+                }
+
+                // 2. Trigger the full recalculation logic.
+                recalculate(id);
+            }
+
+            function handleUnitChange(e) {
+                const id = e.target.dataset.id;
+                // When a unit changes, the underlying SI value in the state is correct.
+                // We just need to update the text box to reflect this same SI value in the new units.
+                const valueSI = state[id];
+                if (!isFinite(valueSI)) return;
+
+                const config = parameters[id];
+                const inputEl = document.getElementById(`input-${id}`);
+                const unitEl = document.getElementById(`unit-${id}`);
+                const modeEl = document.getElementById(`mode-${id}`);
+                
+                const unitMultiplier = config.units[unitEl.value];
+                const modeMultiplier = modeEl ? config.modes[modeEl.value] : 1;
+                const displayValue = valueSI / (unitMultiplier * modeMultiplier);
+                
+                inputEl.value = formatNumber(displayValue);
+            }
+
+            function handleDifferentialChange() {
+                // When the diff mode changes, assume material is constant and recalculate voltage
+                recalculate('rh');
+            }
+            
+            // --- Event Listeners ---
+            document.querySelectorAll('.input-field, .slider').forEach(el => el.addEventListener('input', handleInputChange));
+            document.querySelectorAll('.unit-select').forEach(el => el.addEventListener('change', handleUnitChange));
+            document.getElementById('differential-checkbox').addEventListener('change', handleDifferentialChange);
+
+            // --- Initialization ---
+            function initialize() {
+                // 1. Populate state with initial SI values
+                Object.keys(parameters).forEach(id => {
+                    state[id] = parameters[id].value;
+                });
+
+                // 2. Set default units in the UI
+                const defaultUnits = {
+                    current: 'A', field: 'G', thickness: 'mm',
+                    voltage: 'V', n: 'cm⁻³', rh: 'Ohm·cm/G'
+                };
+                const defaultModes = { voltage: 'rms', current: 'peak' };
+
+                Object.keys(defaultUnits).forEach(id => {
+                    document.getElementById(`unit-${id}`).value = defaultUnits[id];
+                });
+                Object.keys(defaultModes).forEach(id => {
+                    document.getElementById(`mode-${id}`).value = defaultModes[id];
+                });
+
+                // 3. Set up the initial UI from the state
+                updateAllUiFromState();
+            }
+
+            initialize();
+        });
+    </script>
+</body>
+</html>
