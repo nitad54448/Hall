@@ -16,7 +16,9 @@ A responsive web-based calculator for computing Hall effect parameters in semico
 ```math
 V_H = \frac{R_H \cdot I \cdot B}{t}
 
-Hall Coefficient
+```math
+
+### Hall Coefficient
 R_H = \frac{V_H \cdot t}{I \cdot B}
 
 Carrier Density
@@ -58,4 +60,4 @@ Logarithmic slider scaling
 
 Real-time unit conversion system
 
-text
+
