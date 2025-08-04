@@ -96,5 +96,5 @@ The calculator is divided into two main sections:
 
 ## Technical Implementation
 
--   **Frontend**: Built with vanilla JavaScript, HTML5, and CSS.
+-   **Frontend**: Built with JavaScript, HTML5, and CSS.
 -   **Styling**: Uses [Tailwind CSS](https://tailwindcss.com/)
