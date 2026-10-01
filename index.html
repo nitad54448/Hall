@@ -62,6 +62,16 @@
             outline: none;
             border-color: #38bdf8; /* sky-500 */
         }
+        .badge-display {
+            background-color: #0f172a;
+            border: 1px solid #334155;
+            border-radius: 6px;
+            padding: 0.5rem 0.75rem;
+            color: #38bdf8;
+            font-size: 0.875rem;
+            text-align: center;
+            user-select: none;
+        }
         .slider-container {
             grid-column: 1 / -1;
             display: flex;
@@ -156,64 +166,81 @@
             const q = 1.60217663e-19;
             const sqrt2 = Math.sqrt(2);
 
+            // Mode factors relative to peak / DC amplitude
+            const measurementModes = {
+                'DC': 1,
+                'peak': 1,
+                'rms': 1 / sqrt2
+            };
+
+            // Global measurement mode linked across I and V
+            let currentMode = 'DC';
+
             // --- Configuration for all parameters ---
             const parameters = {
                 current: { 
                     label: 'Current (I)', 
                     value: 0.1, 
-                    min: 1e-3, max: 1.0,
+                    min: 1e-6, max: 10.0,
                     units: { 'A': 1, 'mA': 1e-3, 'µA': 1e-6 },
-                    modes: { 'peak': 1, 'rms': sqrt2 },
+                    hasModeSelector: true,
                     group: 'setup-inputs'
                 },
                 field: { 
                     label: 'Magnetic Field (B)', 
                     value: 1.0, 
-                    min: 1e-3, max: 10, 
+                    min: 1e-4, max: 20, 
                     units: { 'T': 1, 'mT': 1e-3, 'G': 1e-4 },
                     group: 'setup-inputs'
                 },
                 thickness: { 
                     label: 'Thickness (t)', 
-                    value: 1e-3,
-                    min: 1e-6, max: 0.01, 
-                    units: { 'm': 1, 'cm': 1e-2, 'mm': 1e-3, 'µm': 1e-6 },
+                    value: 1.75e-4,
+                    min: 1e-7, max: 0.05, 
+                    units: { 'mm': 1e-3, 'µm': 1e-6, 'cm': 1e-2, 'm': 1 },
                     group: 'setup-inputs'
                 },
                 voltage: { 
                     label: 'Hall Voltage (V_H)', 
-                    value: 6.2421e-6,
-                    min: 1e-9, max: 5, 
-                    units: { 'V': 1, 'mV': 1e-3, 'µV': 1e-6 },
-                    modes: { 'peak': 1, 'rms': sqrt2 },
+                    value: 4.30e-3,
+                    min: 1e-9, max: 10, 
+                    units: { 'mV': 1e-3, 'µV': 1e-6, 'V': 1 },
+                    hasModeIndicator: true,
                     group: 'setup-inputs'
                 },
-                 n: { 
+                n: { 
                     label: 'Carrier Density (n)', 
-                    value: 1e26,
-                    min: 1e20, max: 1e30,
-                    units: { 'm⁻³': 1, 'cm⁻³': 1e6 },
+                    value: 8.3e23,
+                    min: 1e18, max: 1e31,
+                    units: { 'cm⁻³': 1e6, 'm⁻³': 1 },
                     group: 'results-inputs'
                 },
                 rh: { 
                     label: 'Hall Coeff. (R_H)', 
-                    value: 6.2421e-8,
-                    min: 1e-11, max: 1e-1, 
+                    value: 7.52e-6,
+                    min: 1e-12, max: 1e2, 
                     units: { 'm³/C': 1, 'cm³/C': 1e-6, 'Ohm·cm/G': 0.01 },
                     group: 'results-inputs'
                 }
             };
 
-            // The single source of truth for all values, always in SI units.
+            // State stores SI amplitudes (peak/DC equivalent)
             let state = {};
 
             // --- UI Generation ---
             function createInputField(id) {
                 const config = parameters[id];
                 const container = document.getElementById(config.group);
-                const hasModes = config.modes;
                 const unitOptions = Object.keys(config.units).map(u => `<option value="${u}">${u}</option>`).join('');
-                const modeOptions = hasModes ? Object.keys(config.modes || {}).map(m => `<option value="${m}">${m}</option>`).join('') : '';
+
+                let modeElementHTML = '';
+                if (config.hasModeSelector) {
+                    const modeOptions = Object.keys(measurementModes).map(m => `<option value="${m}">${m}</option>`).join('');
+                    modeElementHTML = `<select id="mode-select" class="unit-select flex-grow">${modeOptions}</select>`;
+                } else if (config.hasModeIndicator) {
+                    modeElementHTML = `<div id="voltage-mode-badge" class="badge-display flex-grow">${currentMode}</div>`;
+                }
+
                 const logMin = Math.log10(config.min);
                 const logMax = Math.log10(config.max);
                 const logVal = Math.log10(config.value);
@@ -224,7 +251,7 @@
                         <input type="text" id="input-${id}" data-id="${id}" class="input-field">
                         <div class="flex space-x-2">
                             <select id="unit-${id}" data-id="${id}" class="unit-select flex-grow">${unitOptions}</select>
-                            ${hasModes ? `<select id="mode-${id}" data-id="${id}" class="unit-select flex-grow">${modeOptions}</select>` : ''}
+                            ${modeElementHTML}
                         </div>
                         <div class="slider-container">
                             <input type="range" id="slider-${id}" data-id="${id}" min="${logMin}" max="${logMax}" step="0.01" value="${logVal}" class="slider">
@@ -234,20 +261,6 @@
                 container.innerHTML += elementHTML;
             }
             Object.keys(parameters).forEach(createInputField);
-
-            // Add Differential Checkbox
-            const setupContainer = document.getElementById('setup-inputs');
-            const differentialHTML = `
-                <div class="flex items-center justify-end mt-2 text-sm">
-                    <div class="tooltip-container">
-                        <label for="differential-checkbox" class="mr-2 cursor-pointer text-slate-400 hover:text-sky-500">Differential</label>
-                        <span class="tooltip">Select if the measured voltage is the difference between measurements at +B and -B, i.e., V_H(diff) = V(+B) - V(-B).</span>
-                    </div>
-                    <input type="checkbox" id="differential-checkbox" class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-sky-500">
-                </div>
-            `;
-            setupContainer.innerHTML += differentialHTML;
-
 
             // --- Helper Functions ---
             function formatNumber(num) {
@@ -259,35 +272,41 @@
                 return Number(num.toPrecision(4)).toString();
             }
 
+            function getModeFactor() {
+                return measurementModes[currentMode] || 1;
+            }
+
             // --- Core Calculation & State Logic ---
             function recalculate(sourceId) {
                 const sourceGroup = parameters[sourceId].group;
-                const isDifferential = document.getElementById('differential-checkbox').checked;
-                const voltageFactor = isDifferential ? 2 : 1;
 
                 if (sourceGroup === 'setup-inputs') {
-                    // A setup parameter was changed, so recalculate material properties.
-                    if (state.current > 0 && state.field !== 0) {
-                        const singleFieldVoltage = state.voltage / voltageFactor;
-                        state.rh = (singleFieldVoltage * state.thickness) / (state.current * state.field);
+                    if (state.current > 0 && state.field !== 0 && state.thickness > 0) {
+                        state.rh = (state.voltage * state.thickness) / (state.current * state.field);
                         state.n = 1 / (q * Math.abs(state.rh));
                     }
-                } else { // sourceGroup === 'results-inputs'
-                    // A material property was changed, so recalculate the expected voltage.
+                } else {
                     if (sourceId === 'n') {
                         state.rh = 1 / (q * state.n);
                     } else if (sourceId === 'rh') {
                         state.n = 1 / (q * Math.abs(state.rh));
                     }
-                    const singleFieldVoltage = (state.rh * state.current * state.field) / state.thickness;
-                    state.voltage = singleFieldVoltage * voltageFactor;
+                    if (state.thickness > 0) {
+                        state.voltage = (state.rh * state.current * state.field) / state.thickness;
+                    }
                 }
-                
+
                 updateAllUiFromState();
             }
 
             // --- UI Update Logic ---
             function updateAllUiFromState() {
+                // Update linked voltage badge
+                const badgeEl = document.getElementById('voltage-mode-badge');
+                if (badgeEl) badgeEl.textContent = currentMode;
+
+                const modeFactor = getModeFactor();
+
                 Object.keys(parameters).forEach(id => {
                     const valueSI = state[id];
                     if (!isFinite(valueSI)) return;
@@ -296,30 +315,28 @@
                     const inputEl = document.getElementById(`input-${id}`);
                     const sliderEl = document.getElementById(`slider-${id}`);
                     const unitEl = document.getElementById(`unit-${id}`);
-                    const modeEl = document.getElementById(`mode-${id}`);
 
-                    // Update slider
-                    const logValueSI = Math.log10(Math.abs(valueSI));
-                    if(isFinite(logValueSI) && sliderEl) {
-                        sliderEl.value = logValueSI;
+                    if (sliderEl) {
+                        const logValueSI = Math.log10(Math.abs(valueSI));
+                        if (isFinite(logValueSI)) {
+                            sliderEl.value = logValueSI;
+                        }
                     }
-                    
-                    // Update text input, but not if it's the one being actively edited
+
                     if (document.activeElement !== inputEl) {
-                         const unitMultiplier = config.units[unitEl.value];
-                         const modeMultiplier = modeEl ? config.modes[modeEl.value] : 1;
-                         const displayValue = valueSI / (unitMultiplier * modeMultiplier);
-                         inputEl.value = formatNumber(displayValue);
+                        const unitMultiplier = config.units[unitEl.value];
+                        const activeModeMultiplier = (config.hasModeSelector || config.hasModeIndicator) ? modeFactor : 1;
+                        const displayValue = valueSI / (unitMultiplier * activeModeMultiplier);
+                        inputEl.value = formatNumber(displayValue);
                     }
                 });
             }
-            
+
             // --- Event Handlers ---
             function handleInputChange(e) {
                 const id = e.target.dataset.id;
                 const isFromSlider = e.target.type === 'range';
-                
-                // 1. Update the state from the single input that changed.
+
                 if (isFromSlider) {
                     const logValue = parseFloat(e.target.value);
                     state[id] = Math.pow(10, logValue);
@@ -327,70 +344,68 @@
                     const config = parameters[id];
                     const inputEl = document.getElementById(`input-${id}`);
                     const unitEl = document.getElementById(`unit-${id}`);
-                    const modeEl = document.getElementById(`mode-${id}`);
-                    let value = parseFloat(inputEl.value.replace(/e/i, 'e'));
+                    const value = parseFloat(inputEl.value.replace(/e/i, 'e'));
                     if (isNaN(value)) return;
+
                     const unitMultiplier = config.units[unitEl.value];
-                    const modeMultiplier = modeEl ? config.modes[modeEl.value] : 1;
+                    const modeMultiplier = (config.hasModeSelector || config.hasModeIndicator) ? getModeFactor() : 1;
                     state[id] = value * unitMultiplier * modeMultiplier;
                 }
 
-                // 2. Trigger the full recalculation logic.
                 recalculate(id);
             }
 
             function handleUnitChange(e) {
                 const id = e.target.dataset.id;
-                // When a unit changes, the underlying SI value in the state is correct.
-                // We just need to update the text box to reflect this same SI value in the new units.
                 const valueSI = state[id];
                 if (!isFinite(valueSI)) return;
 
                 const config = parameters[id];
                 const inputEl = document.getElementById(`input-${id}`);
                 const unitEl = document.getElementById(`unit-${id}`);
-                const modeEl = document.getElementById(`mode-${id}`);
-                
+
                 const unitMultiplier = config.units[unitEl.value];
-                const modeMultiplier = modeEl ? config.modes[modeEl.value] : 1;
+                const modeMultiplier = (config.hasModeSelector || config.hasModeIndicator) ? getModeFactor() : 1;
                 const displayValue = valueSI / (unitMultiplier * modeMultiplier);
-                
+
                 inputEl.value = formatNumber(displayValue);
             }
 
-            function handleDifferentialChange() {
-                // When the diff mode changes, assume material is constant and recalculate voltage
-                recalculate('rh');
+            function handleModeChange(e) {
+                currentMode = e.target.value;
+                updateAllUiFromState();
             }
-            
+
             // --- Event Listeners ---
             document.querySelectorAll('.input-field, .slider').forEach(el => el.addEventListener('input', handleInputChange));
-            document.querySelectorAll('.unit-select').forEach(el => el.addEventListener('change', handleUnitChange));
-            document.getElementById('differential-checkbox').addEventListener('change', handleDifferentialChange);
+            document.querySelectorAll('.unit-select').forEach(el => {
+                if (el.id !== 'mode-select') {
+                    el.addEventListener('change', handleUnitChange);
+                }
+            });
+            document.getElementById('mode-select').addEventListener('change', handleModeChange);
 
             // --- Initialization ---
             function initialize() {
-                // 1. Populate state with initial SI values
                 Object.keys(parameters).forEach(id => {
                     state[id] = parameters[id].value;
                 });
 
-                // 2. Set default units in the UI
                 const defaultUnits = {
-                    current: 'A', field: 'G', thickness: 'mm',
-                    voltage: 'V', n: 'cm⁻³', rh: 'Ohm·cm/G'
+                    current: 'A',
+                    field: 'T',
+                    thickness: 'mm',
+                    voltage: 'mV',
+                    n: 'cm⁻³',
+                    rh: 'm³/C'
                 };
-                const defaultModes = { voltage: 'rms', current: 'peak' };
 
                 Object.keys(defaultUnits).forEach(id => {
                     document.getElementById(`unit-${id}`).value = defaultUnits[id];
                 });
-                Object.keys(defaultModes).forEach(id => {
-                    document.getElementById(`mode-${id}`).value = defaultModes[id];
-                });
 
-                // 3. Set up the initial UI from the state
-                updateAllUiFromState();
+                document.getElementById('mode-select').value = currentMode;
+                recalculate('n');
             }
 
             initialize();
