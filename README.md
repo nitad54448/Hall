@@ -1,5 +1,11 @@
 # Hall Effect Calculator
 
+Review issue 19: the shared RMS input factor converts displayed RMS amplitudes
+to the peak amplitudes stored internally. A 1 A peak current therefore displays
+as 0.7071 A RMS. Current and Hall voltage use the same conversion for input,
+display and unit changes; changing modes preserves the underlying calculation.
+Run `node --test tests/*.test.cjs` for the UI conversion regression tests.
+
 A simple web-based calculator for estimating Hall effect parameters (single band, classical system). This tool allows for the interactive exploration of the relationships between experimental setup variables (like current, magnetic field, and sample thickness) and carrier density. Only the magnitude is considered, the sign of carriers is ignored. 
 
 ***
