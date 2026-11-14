@@ -41,3 +41,14 @@ test('unit changes and sliders use the same peak-based state',()=>{
   h.change('slider-current',0,'input');h.change('unit-current','A');near(h.node('input-current').value,1/Math.sqrt(2));
   h.change('mode-select','DC');near(h.node('input-current').value,1);
 });
+test('Ohm*cm/G unit converts by 100 m^3/C and negative R_H sign is preserved across n and slider edits',()=>{
+  const h=harness();
+  h.change('input-rh',-0.01,'input');
+  h.change('unit-rh','Ohm·cm/G');
+  near(Number(h.node('input-rh').value),-1e-4,1e-7);
+  h.change('unit-rh','m³/C');
+  h.change('input-n',1e18,'input');
+  assert(Number(h.node('input-rh').value) < 0, `expected negative R_H after editing n, got ${h.node('input-rh').value}`);
+  h.change('slider-rh',-6,'input');
+  near(Number(h.node('input-rh').value),-1e-6,1e-9);
+});

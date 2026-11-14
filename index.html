@@ -219,7 +219,7 @@
                     label: 'Hall Coeff. (R_H)', 
                     value: 7.52e-6,
                     min: 1e-12, max: 1e2, 
-                    units: { 'm³/C': 1, 'cm³/C': 1e-6, 'Ohm·cm/G': 0.01 },
+                    units: { 'm³/C': 1, 'cm³/C': 1e-6, 'Ohm·cm/G': 100 },
                     group: 'results-inputs'
                 }
             };
@@ -287,7 +287,8 @@
                     }
                 } else {
                     if (sourceId === 'n') {
-                        state.rh = 1 / (q * state.n);
+                        const rhSign = state.rh < 0 ? -1 : 1;
+                        state.rh = rhSign / (q * state.n);
                     } else if (sourceId === 'rh') {
                         state.n = 1 / (q * Math.abs(state.rh));
                     }
@@ -339,7 +340,8 @@
 
                 if (isFromSlider) {
                     const logValue = parseFloat(e.target.value);
-                    state[id] = Math.pow(10, logValue);
+                    const sign = state[id] < 0 ? -1 : 1;
+                    state[id] = sign * Math.pow(10, logValue);
                 } else {
                     const config = parameters[id];
                     const inputEl = document.getElementById(`input-${id}`);
